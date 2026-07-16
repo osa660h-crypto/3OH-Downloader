@@ -42,6 +42,26 @@ st.markdown("""
     .stButton>button:hover {
         background-color: #e03e3e;
     }
+    /* ستايل مخصص لزر التحميل الأخضر الكبير */
+    .btn-green {
+        display: block;
+        width: 100%;
+        background-color: #2ec4b6 !important;
+        color: white !important;
+        text-align: center;
+        padding: 14px 20px;
+        font-size: 18px;
+        font-weight: bold;
+        border-radius: 10px;
+        text-decoration: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-top: 15px;
+        box-sizing: border-box;
+    }
+    .btn-green:hover {
+        background-color: #25a195 !important;
+        color: white !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -69,7 +89,7 @@ file_type = st.radio(
     ("فيديو (MP4)", "صوت فقط (MP3)")
 )
 
-# اختيار الجودة وإعادتها بشكل مرتب
+# اختيار الجودة
 selected_quality = "best"
 if file_type == "فيديو (MP4)":
     quality_choice = st.selectbox(
@@ -85,7 +105,7 @@ if st.button(btn_label):
     if url.strip() == "":
         st.warning("الرجاء إدخال رابط المقطع أولاً!")
     else:
-        with st.spinner("جاري استخراج وتحضير المقطع للتحميل المباشر... انتظر ثواني ⏳"):
+        with st.spinner("جاري استخراج رابط المقطع الفوري... انتظر ثواني ⏳"):
             try:
                 # إعدادات بسيطة وسريعة لاستخراج الروابط وتخطي الحجب
                 ydl_opts = {
@@ -105,36 +125,16 @@ if st.button(btn_label):
 
                     if direct_url:
                         st.success("🎉 تم استخراج المقطع بنجاح وجاهز للحفظ في جهازك!")
-                        st.write(f"**عنوان المقطع:** {title}")
+                        st.markdown(f"**عنوان المقطع:** {title}")
                         
-                        # تنظيف العنوان لاسم الملف النهائي
-                        clean_title = "".join([c for c in title if c.isalpha() or c.isdigit() or c==' ']).rstrip()
-                        if not clean_title:
-                            clean_title = "download"
-                            
                         ext = "mp3" if file_type == "صوت فقط (MP3)" else "mp4"
                         
-                        # الحيلة البرمجية: إضافة خيار إجبار التنزيل (Download Attribute) 
-                        # واستخدام دالة جافا سكريبت لإجبار المتصفح على تحميل الملف فوراً بدلاً من تشغيله
-                        html_download_button = f"""
-                        <div style="text-align: center; margin-top: 15px;">
-                            <a id="dl-link" href="{direct_url}" download="{clean_title}.{ext}" style="text-decoration: none;">
-                                <button style="background-color: #2ec4b6; color: white; border: none; padding: 15px; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    اضغط هنا لحفظ المقطع على جهازك فوراً 📥
-                                </button>
-                            </a>
-                        </div>
-                        <script>
-                            // تعزيز الإجبار لتنزيل الملف عبر محاكاة الضغط وتغيير ترويسة الرابط
-                            const link = document.getElementById('dl-link');
-                            link.addEventListener('click', function(e) {{
-                                // هذه الخطوة تضمن بشكل كبير تحفيز المتصفح لبدء التحميل الفوري بدلاً من المعاينة
-                                link.setAttribute('target', '_self');
-                            }});
-                        </script>
-                        """
-                        st.components.v1.html(html_download_button, height=80)
-                        st.info("💡 إذا لم يبدأ التحميل تلقائياً أو فتح في صفحة سوداء: اضغط مطولاً على الفيديو (في الجوال) واختر 'حفظ الفيديو'، أو اضغط على النقاط الثلاث أسفل المقطع واختر 'تحميل'!")
+                        # هنا الزر الأخضر المباشر والواضح لحفظ الملف
+                        st.markdown(
+                            f'<a class="btn-green" href="{direct_url}" target="_blank" rel="noopener noreferrer">اضغط هنا لحفظ الملف على جهازك 📥</a>',
+                            unsafe_allow_html=True
+                        )
+                        st.info("💡 معلومة: إذا فتح لك المقطع في صفحة سوداء كاملة: اضغط على النقاط الثلاث أسفل الفيديو في تلك الصفحة ثم اختر 'تحميل' (Download) لحفظه مباشرة!")
                     else:
                         st.error("عذراً، لم نتمكن من الحصول على رابط التحميل المباشر.")
 

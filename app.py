@@ -1,13 +1,6 @@
 import streamlit as st
-import os
 import yt_dlp
-import imageio_ffmpeg
-
-# الحصول على مسار ffmpeg لضمان دمج الجودات العالية بدون مشاكل
-try:
-    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-except Exception:
-    ffmpeg_path = None
+import requests
 
 # إعدادات الصفحة الأساسية
 st.set_page_config(
@@ -44,16 +37,6 @@ st.markdown("""
         font-size: 18px;
         border: none;
     }
-    /* تصميم زر التحميل الأخضر */
-    .stDownloadButton>button {
-        background-color: #2ec4b6 !important;
-        color: white !important;
-        border-radius: 10px !important;
-        width: 100% !important;
-        height: 50px !important;
-        font-size: 18px !important;
-        border: none !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -65,7 +48,7 @@ platforms_text = "يدعم التحميل من: YouTube 🎥 | TikTok 🎵 | Ins
 input_label = "ألصق رابط المقطع هنا (يوتيوب، تيك توك، إلخ):"
 format_label = "اختر نوع الملف:"
 quality_label = "اختر جودة الفيديو المطلوبة:"
-btn_label = "معالجة وتحضير الرابط 🚀"
+btn_label = "بدء معالجة وتحميل المقطع 🚀"
 
 # --- واجهة الموقع ---
 st.markdown(f"<h1 style='text-align: center; color: #ff4b4b; margin-bottom: 0px;'>{title_1}</h1>", unsafe_allow_html=True)
@@ -81,110 +64,79 @@ file_type = st.radio(
     ("فيديو (MP4)", "صوت فقط (MP3)")
 )
 
-# قائمة اختيار الجودة
+# قائمة اختيار الجودة لليوتيوب وغيره
 selected_quality = "best"
 if file_type == "فيديو (MP4)":
     quality_choice = st.selectbox(
         quality_label,
         (
-            "أعلى جودة متوفرة (FHD / 4K)", 
-            "جودة عالية (1080p)", 
+            "أعلى جودة متوفرة (دمج تلقائي)", 
             "جودة متوسطة (720p)", 
-            "جودة عادية (480p)", 
-            "أقل جودة لتوفير البيانات"
+            "جودة عادية (360p)"
         )
     )
     
-    # تحويل الاختيات لبروتوكول يفهمه البوت
-    if "4K" in quality_choice:
-        selected_quality = "bestvideo+bestaudio/best"
-    elif "1080p" in quality_choice:
-        selected_quality = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
-    elif "720p" in quality_choice:
-        selected_quality = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
-    elif "480p" in quality_choice:
-        selected_quality = "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
+    if "720p" in quality_choice:
+        selected_quality = "best[height<=720]"
+    elif "360p" in quality_choice:
+        selected_quality = "best[height<=360]"
     else:
-        selected_quality = "worstvideo+worstaudio/worst"
+        selected_quality = "best"
 
-# زر البدء والتحميل الفعلي
+# زر التحميل المباشر
 if st.button(btn_label):
     if url.strip() == "":
         st.warning("الرجاء إدخال رابط المقطع أولاً!")
     else:
-        with st.spinner("جاري التحليل والتحميل على السيرفر... انتظر ثواني ⏳"):
+        with st.spinner("جاري جلب الملف وتجهيز التحميل الآمن... انتظر ثواني ⏳"):
             try:
-                # التحميل مؤقتاً في مجلد السيرفر الحالي
-                download_path = os.getcwd()
-                
-                # خيارات yt-dlp الأساسية مع حزمة تخطي الحجب والأمان
+                # خيارات yt-dlp الذكية للحصول على الرابط المباشر للملف بدون تحميله على السيرفر
                 ydl_opts = {
-                    'outtmpl': os.path.join(download_path, 'downloaded_file.%(ext)s'),
                     'quiet': True,
                     'no_warnings': True,
-                    'overwrites': True,
-                    'nocheckcertificate': True,  # تخطي فحص الشهادات الأمنية للسيرفر
-                    'headers': {  # تمويه السيرفر وكأنه متصفح طبيعي لتجنب الـ 403
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'nocheckcertificate': True,
+                    'format': 'bestaudio/best' if file_type == "صوت فقط (MP3)" else selected_quality,
+                    'headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                         'Accept-Language': 'en-US,en;q=0.5',
-                        'Sec-Fetch-Mode': 'navigate',
                     }
                 }
 
-                if ffmpeg_path:
-                    ydl_opts['ffmpeg_location'] = ffmpeg_path
-
-                if file_type == "صوت فقط (MP3)":
-                    ydl_opts.update({
-                        'format': 'bestaudio/best',
-                        'postprocessors': [{
-                            'key': 'FFmpegExtractAudio',
-                            'preferredcodec': 'mp3',
-                            'preferredquality': '192',
-                        }],
-                    })
-                else:
-                    ydl_opts.update({
-                        'format': selected_quality,
-                        'merge_output_format': 'mp4'
-                    })
-
-                # تحميل المقطع على السيرفر مؤقتاً
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=True)
-                    # استخراج العنوان الحقيقي للمقطع
-                    original_title = info.get('title', 'download')
+                    info = ydl.extract_info(url, download=False)
+                    direct_url = info.get('url', None)
+                    original_title = info.get('title', 'video')
                     
-                    # تحديد الملف المؤقت المخرج
-                    if file_type == "صوت فقط (MP3)":
-                        temp_file = os.path.join(download_path, "downloaded_file.mp3")
-                        final_filename = f"{original_title}.mp3"
-                        mime_type = "audio/mpeg"
-                    else:
-                        temp_file = os.path.join(download_path, "downloaded_file.mp4")
-                        final_filename = f"{original_title}.mp4"
-                        mime_type = "video/mp4"
+                    # تنظيف اسم الملف من الرموز الخاصة لتفادي المشاكل أثناء الحفظ
+                    clean_title = "".join([c for c in original_title if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+                    if not clean_title:
+                        clean_title = "downloaded_file"
+                    
+                    ext = "mp3" if file_type == "صوت فقط (MP3)" else "mp4"
+                    filename = f"{clean_title}.{ext}"
 
-                # قراءة الملف المحمل لإتاحته للتحميل الفوري للمستخدم
-                if os.path.exists(temp_file):
-                    with open(temp_file, "rb") as file:
-                        file_bytes = file.read()
-                    
-                    st.success("🎉 تم تجهيز المقطع بنجاح!")
-                    
-                    # زر التحميل الفعلي للمتصفح الخاص بالمستخدم
-                    st.download_button(
-                        label="اضغط هنا لحفظ الملف على جهازك 📥",
-                        data=file_bytes,
-                        file_name=final_filename,
-                        mime=mime_type
-                    )
-                    
-                    # تنظيف وحذف الملف المؤقت من السيرفر فوراً للحفاظ على المساحة
-                    os.remove(temp_file)
-                else:
-                    st.error("عذراً، فشل تجهيز الملف للتحميل.")
+                    if direct_url:
+                        # إرسال طلب جلب تدفقي للملف وتمريره للمتصفح لتجاوز الحظر
+                        headers = {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        }
+                        response = requests.get(direct_url, headers=headers, stream=True)
+                        
+                        if response.status_code == 200:
+                            st.success(f"🎉 تم تجهيز الملف: {original_title}")
+                            
+                            # زر تحميل Streamlit القياسي: يسحب البيانات كتدفق مباشرة لجهاز المستخدم
+                            st.download_button(
+                                label="اضغط هنا لحفظ المقطع في جهازك فوراً 📥",
+                                data=response.content,
+                                file_name=filename,
+                                mime="audio/mpeg" if ext == "mp3" else "video/mp4"
+                            )
+                        else:
+                            st.error(f"فشل الاتصال بسيرفر الفيديو (كود الخطأ: {response.status_code})")
+                    else:
+                        st.error("عذراً، لم نتمكن من العثور على رابط مباشر لهذا المقطع.")
                 
             except Exception as e:
-                st.error(f"عذراً، حدث خطأ أثناء المعالجة: {str(e)}")
+                st.error(f"عذراً، حدث خطأ أثناء الاتصال بالمنصة: {str(e)}")

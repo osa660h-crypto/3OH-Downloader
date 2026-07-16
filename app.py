@@ -1,5 +1,5 @@
 import streamlit as st
-import requests
+import yt_dlp
 
 # إعدادات الصفحة الأساسية
 st.set_page_config(
@@ -8,7 +8,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- لمسة التصميم الفخم والخطوط الواضحة ---
+# --- تنسيق المظهر الأنيق الأصلي ---
 st.markdown("""
     <style>
     .stApp {
@@ -22,14 +22,13 @@ st.markdown("""
         color: #1e293b !important;
         border: 1px solid #cbd5e1 !important;
         height: 48px !important;
-        font-size: 16px !important;
     }
     h1 {
         color: #ff4b4b;
         text-align: center;
         font-family: 'Cairo', sans-serif;
     }
-    /* تصميم زر التحميل الفخم */
+    /* زر المعالجة الأحمر */
     .stButton>button {
         background-color: #ff4b4b;
         color: white;
@@ -42,9 +41,8 @@ st.markdown("""
     }
     .stButton>button:hover {
         background-color: #e03e3e;
-        color: white;
     }
-    /* تصميم زر الحفظ الأخضر */
+    /* زر التحميل الأخضر الفخم */
     .stDownloadButton>button {
         background-color: #2ec4b6 !important;
         color: white !important;
@@ -58,15 +56,14 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# نصوص الواجهة المنسقة
+# نصوص الواجهة العربية
 title_1 = "📥 بوت تحميل المقاطع الذكي 📥"
 title_2_part1 = "3OH"
 title_2_part2 = "لتحميل المقاطع"
 platforms_text = "يدعم التحميل من: YouTube 🎥 | TikTok 🎵 | Instagram 📸"
 input_label = "ألصق رابط المقطع هنا (يوتيوب، تيك توك، إنستغرام):"
 format_label = "اختر صيغة التحميل:"
-quality_label = "اختر جودة الفيديو المطلوبة:"
-btn_label = "بدء معالجة وتحضير المقطع 🚀"
+btn_label = "معالجة واستخراج المقطع 🚀"
 
 # --- واجهة الموقع ---
 st.markdown(f"<h1 style='text-align: center; color: #ff4b4b; margin-bottom: 0px;'>{title_1}</h1>", unsafe_allow_html=True)
@@ -82,65 +79,45 @@ file_type = st.radio(
     ("فيديو (MP4)", "صوت فقط (MP3)")
 )
 
-# اختيار الجودة
-selected_quality = "720"
-if file_type == "فيديو (MP4)":
-    quality_choice = st.selectbox(
-        quality_label,
-        ("جودة عالية (720p)", "جودة عادية (360p)")
-    )
-    if "360p" in quality_choice:
-        selected_quality = "360"
-
-# زر التحليل والتحميل الفعلي من الـ API الذكي
 if st.button(btn_label):
     if url.strip() == "":
         st.warning("الرجاء إدخال رابط المقطع أولاً!")
     else:
-        with st.spinner("جاري جلب وتجهيز المقطع... انتظر ثواني قليلة ⏳"):
+        with st.spinner("جاري استخراج رابط المقطع الفوري... انتظر ثواني ⏳"):
             try:
-                # إعداد البيانات لإرسالها للـ API القوي والسريع لتجنب الحظر
-                api_url = "https://api.cobalt.tools/api/json"
-                headers = {
-                    "Accept": "application/json",
-                    "Content-Type": "application/json"
+                # إعدادات بسيطة وسريعة جداً لاستخراج الروابط دون حظر
+                ydl_opts = {
+                    'quiet': True,
+                    'no_warnings': True,
+                    'nocheckcertificate': True,
+                    'format': 'bestaudio/best' if file_type == "صوت فقط (MP3)" else 'best/bestvideo+bestaudio',
+                    'headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    }
                 }
-                
-                payload = {
-                    "url": url,
-                    "downloadMode": "audio" if file_type == "صوت فقط (MP3)" else "video",
-                    "videoQuality": selected_quality,
-                    "filenamePattern": "pretty"
-                }
-                
-                response = requests.post(api_url, json=payload, headers=headers)
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    download_link = result.get("url")
-                    
-                    if download_link:
-                        # تحميل ملف المقطع مؤقتاً لتمريره للمستخدم مباشرة دون حظر
-                        file_response = requests.get(download_link, stream=True)
-                        if file_response.status_code == 200:
-                            st.success("🎉 تم تجهيز المقطع بنجاح وتخطي الحظر!")
-                            
-                            ext = "mp3" if file_type == "صوت فقط (MP3)" else "mp4"
-                            mime_type = "audio/mpeg" if ext == "mp3" else "video/mp4"
-                            
-                            # عرض زر الحفظ الأخضر الفخم
-                            st.download_button(
-                                label="اضغط هنا لحفظ الملف على جهازك 📥",
-                                data=file_response.content,
-                                file_name=f"3OH_Download.{ext}",
-                                mime=mime_type
-                            )
-                        else:
-                            st.error("فشل جلب ملف المقطع للتحميل المباشر.")
+
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    direct_url = info.get('url', None)
+                    title = info.get('title', 'تحميل مقطع')
+
+                    if direct_url:
+                        st.success("🎉 تم استخراج المقطع بنجاح وتخطي الحظر!")
+                        st.write(f"**عنوان المقطع:** {title}")
+                        
+                        # نستخدم زر تحميل ذكي يوجه المستخدم للرابط المباشر للملف الأصلي
+                        ext = "mp3" if file_type == "صوت فقط (MP3)" else "mp4"
+                        st.markdown(
+                            f'<a href="{direct_url}" download="{title}.{ext}" target="_blank" style="text-decoration: none;">'
+                            f'<div style="background-color: #2ec4b6; color: white; text-align: center; padding: 15px; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer;">'
+                            f'اضغط هنا لحفظ المقطع على جهازك فورا 📥'
+                            f'</div></a>',
+                            unsafe_allow_html=True
+                        )
+                        st.info("💡 معلومة: إذا فتح لك المقطع في صفحة جديدة، اضغط على النقاط الثلاث أسفل الفيديو ثم اختر 'تحميل' (Download) لحفظه مباشرة!")
                     else:
-                        st.error("عذراً، لم نتمكن من الحصول على رابط التحميل.")
-                else:
-                    st.error(f"عذراً، الخدمة مشغولة حالياً، كود الخطأ: {response.status_code}")
-                    
+                        st.error("عذراً، لم نتمكن من العثور على رابط مباشر لهذا المقطع.")
+
             except Exception as e:
-                st.error(f"حدث خطأ أثناء الاتصال بالخادم: {str(e)}")
+                st.error(f"عذراً، حدث خطأ أثناء المعالجة: {str(e)}")
+                

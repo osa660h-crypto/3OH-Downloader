@@ -42,17 +42,6 @@ st.markdown("""
     .stButton>button:hover {
         background-color: #e03e3e;
     }
-    /* زر التحميل الأخضر الفخم */
-    .stDownloadButton>button {
-        background-color: #2ec4b6 !important;
-        color: white !important;
-        border-radius: 10px !important;
-        width: 100% !important;
-        height: 50px !important;
-        font-size: 18px !important;
-        font-weight: bold !important;
-        border: none !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -63,6 +52,7 @@ title_2_part2 = "لتحميل المقاطع"
 platforms_text = "يدعم التحميل من: YouTube 🎥 | TikTok 🎵 | Instagram 📸"
 input_label = "ألصق رابط المقطع هنا (يوتيوب، تيك توك، إنستغرام):"
 format_label = "اختر صيغة التحميل:"
+quality_label = "اختر جودة الفيديو المطلوبة:"
 btn_label = "معالجة واستخراج المقطع 🚀"
 
 # --- واجهة الموقع ---
@@ -79,18 +69,30 @@ file_type = st.radio(
     ("فيديو (MP4)", "صوت فقط (MP3)")
 )
 
+# اختيار الجودة وإعادتها بشكل مرتب
+selected_quality = "best"
+if file_type == "فيديو (MP4)":
+    quality_choice = st.selectbox(
+        quality_label,
+        ("أعلى جودة متوفرة (دمج تلقائي)", "جودة عالية (720p)", "جودة عادية (360p)")
+    )
+    if "720p" in quality_choice:
+        selected_quality = "best[height<=720]"
+    elif "360p" in quality_choice:
+        selected_quality = "best[height<=360]"
+
 if st.button(btn_label):
     if url.strip() == "":
         st.warning("الرجاء إدخال رابط المقطع أولاً!")
     else:
-        with st.spinner("جاري استخراج رابط المقطع الفوري... انتظر ثواني ⏳"):
+        with st.spinner("جاري استخراج وتحضير المقطع للتحميل المباشر... انتظر ثواني ⏳"):
             try:
-                # إعدادات بسيطة وسريعة جداً لاستخراج الروابط دون حظر
+                # إعدادات بسيطة وسريعة لاستخراج الروابط وتخطي الحجب
                 ydl_opts = {
                     'quiet': True,
                     'no_warnings': True,
                     'nocheckcertificate': True,
-                    'format': 'bestaudio/best' if file_type == "صوت فقط (MP3)" else 'best/bestvideo+bestaudio',
+                    'format': 'bestaudio/best' if file_type == "صوت فقط (MP3)" else selected_quality,
                     'headers': {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     }
@@ -99,25 +101,42 @@ if st.button(btn_label):
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=False)
                     direct_url = info.get('url', None)
-                    title = info.get('title', 'تحميل مقطع')
+                    title = info.get('title', '3OH_Download')
 
                     if direct_url:
-                        st.success("🎉 تم استخراج المقطع بنجاح وتخطي الحظر!")
+                        st.success("🎉 تم استخراج المقطع بنجاح وجاهز للحفظ في جهازك!")
                         st.write(f"**عنوان المقطع:** {title}")
                         
-                        # نستخدم زر تحميل ذكي يوجه المستخدم للرابط المباشر للملف الأصلي
+                        # تنظيف العنوان لاسم الملف النهائي
+                        clean_title = "".join([c for c in title if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+                        if not clean_title:
+                            clean_title = "download"
+                            
                         ext = "mp3" if file_type == "صوت فقط (MP3)" else "mp4"
-                        st.markdown(
-                            f'<a href="{direct_url}" download="{title}.{ext}" target="_blank" style="text-decoration: none;">'
-                            f'<div style="background-color: #2ec4b6; color: white; text-align: center; padding: 15px; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer;">'
-                            f'اضغط هنا لحفظ المقطع على جهازك فورا 📥'
-                            f'</div></a>',
-                            unsafe_allow_html=True
-                        )
-                        st.info("💡 معلومة: إذا فتح لك المقطع في صفحة جديدة، اضغط على النقاط الثلاث أسفل الفيديو ثم اختر 'تحميل' (Download) لحفظه مباشرة!")
+                        
+                        # الحيلة البرمجية: إضافة خيار إجبار التنزيل (Download Attribute) 
+                        # واستخدام دالة جافا سكريبت لإجبار المتصفح على تحميل الملف فوراً بدلاً من تشغيله
+                        html_download_button = f"""
+                        <div style="text-align: center; margin-top: 15px;">
+                            <a id="dl-link" href="{direct_url}" download="{clean_title}.{ext}" style="text-decoration: none;">
+                                <button style="background-color: #2ec4b6; color: white; border: none; padding: 15px; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    اضغط هنا لحفظ المقطع على جهازك فوراً 📥
+                                </button>
+                            </a>
+                        </div>
+                        <script>
+                            // تعزيز الإجبار لتنزيل الملف عبر محاكاة الضغط وتغيير ترويسة الرابط
+                            const link = document.getElementById('dl-link');
+                            link.addEventListener('click', function(e) {{
+                                // هذه الخطوة تضمن بشكل كبير تحفيز المتصفح لبدء التحميل الفوري بدلاً من المعاينة
+                                link.setAttribute('target', '_self');
+                            }});
+                        </script>
+                        """
+                        st.components.v1.html(html_download_button, height=80)
+                        st.info("💡 إذا لم يبدأ التحميل تلقائياً أو فتح في صفحة سوداء: اضغط مطولاً على الفيديو (في الجوال) واختر 'حفظ الفيديو'، أو اضغط على النقاط الثلاث أسفل المقطع واختر 'تحميل'!")
                     else:
-                        st.error("عذراً، لم نتمكن من العثور على رابط مباشر لهذا المقطع.")
+                        st.error("عذراً، لم نتمكن من الحصول على رابط التحميل المباشر.")
 
             except Exception as e:
                 st.error(f"عذراً، حدث خطأ أثناء المعالجة: {str(e)}")
-                

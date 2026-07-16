@@ -44,6 +44,16 @@ st.markdown("""
         font-size: 18px;
         border: none;
     }
+    /* تصميم زر التحميل الأخضر */
+    .stDownloadButton>button {
+        background-color: #2ec4b6 !important;
+        color: white !important;
+        border-radius: 10px !important;
+        width: 100% !important;
+        height: 50px !important;
+        font-size: 18px !important;
+        border: none !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -55,7 +65,7 @@ platforms_text = "يدعم التحميل من: YouTube 🎥 | TikTok 🎵 | Ins
 input_label = "ألصق رابط المقطع هنا (يوتيوب، تيك توك، إلخ):"
 format_label = "اختر نوع الملف:"
 quality_label = "اختر جودة الفيديو المطلوبة:"
-btn_label = "ابدأ التحميل الآن 🚀"
+btn_label = "معالجة وتحضير الرابط 🚀"
 
 # --- واجهة الموقع ---
 st.markdown(f"<h1 style='text-align: center; color: #ff4b4b; margin-bottom: 0px;'>{title_1}</h1>", unsafe_allow_html=True)
@@ -71,7 +81,7 @@ file_type = st.radio(
     ("فيديو (MP4)", "صوت فقط (MP3)")
 )
 
-# قائمة اختيار الجودة (تظهر فقط إذا اختار فيديو)
+# قائمة اختيار الجودة
 selected_quality = "best"
 if file_type == "فيديو (MP4)":
     quality_choice = st.selectbox(
@@ -102,19 +112,19 @@ if st.button(btn_label):
     if url.strip() == "":
         st.warning("الرجاء إدخال رابط المقطع أولاً!")
     else:
-        with st.spinner("جاري التحليل والتحميل بالجودة المطلوبة... انتظر ثواني ⏳"):
+        with st.spinner("جاري التحليل والتحميل على السيرفر... انتظر ثواني ⏳"):
             try:
-                # مسار مجلد التنزيلات للجهاز
-                download_path = os.path.join(os.path.expanduser("~"), "Downloads")
+                # التحميل مؤقتاً في مجلد السيرفر الحالي
+                download_path = os.getcwd()
                 
                 # خيارات yt-dlp الأساسية
                 ydl_opts = {
-                    'outtmpl': os.path.join(download_path, '%(title)s.%(ext)s'),
+                    'outtmpl': os.path.join(download_path, 'downloaded_file.%(ext)s'),
                     'quiet': True,
                     'no_warnings': True,
+                    'overwrites': True, # استبدال الملف القديم لعدم ملء السيرفر
                 }
 
-                # إضافة مسار ffmpeg إذا تم العثور عليه لدمج جودات الفيديو والصوت العالية
                 if ffmpeg_path:
                     ydl_opts['ffmpeg_location'] = ffmpeg_path
 
@@ -133,18 +143,41 @@ if st.button(btn_label):
                         'merge_output_format': 'mp4'
                     })
 
-                # تنفيذ التحميل الفعلي بالخلفية
+                # تحميل المقطع على السيرفر مؤقتاً
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
-                    filename = ydl.prepare_filename(info)
+                    # استخراج العنوان الحقيقي للمقطع لتسمية الملف النهائي للمستخدم بها
+                    original_title = info.get('title', 'download')
                     
-                    # تعديل امتداد الملف في الرسالة إذا لزم الأمر
+                    # تحديد الملف المؤقت المخرج
                     if file_type == "صوت فقط (MP3)":
-                        filename = os.path.splitext(filename)[0] + ".mp3"
-                    elif not filename.endswith('.mp4'):
-                        filename = os.path.splitext(filename)[0] + ".mp4"
+                        temp_file = os.path.join(download_path, "downloaded_file.mp3")
+                        final_filename = f"{original_title}.mp3"
+                        mime_type = "audio/mpeg"
+                    else:
+                        temp_file = os.path.join(download_path, "downloaded_file.mp4")
+                        final_filename = f"{original_title}.mp4"
+                        mime_type = "video/mp4"
 
-                st.success(f"🎉 تم التحميل بنجاح! تم حفظ الملف في مجلد التنزيلات باسم: {os.path.basename(filename)}")
+                # قراءة الملف المحمل لإتاحته للتحميل الفوري للمستخدم
+                if os.path.exists(temp_file):
+                    with open(temp_file, "rb") as file:
+                        file_bytes = file.read()
+                    
+                    st.success("🎉 تم تجهيز المقطع بنجاح!")
+                    
+                    # زر التحميل الفعلي للمتصفح الخاص بالمستخدم
+                    st.download_button(
+                        label="اضغط هنا لحفظ الملف على جهازك 📥",
+                        data=file_bytes,
+                        file_name=final_filename,
+                        mime=mime_type
+                    )
+                    
+                    # تنظيف وحذف الملف المؤقت من السيرفر فوراً للحفاظ على المساحة
+                    os.remove(temp_file)
+                else:
+                    st.error("عذراً، فشل تجهيز الملف للتحميل.")
                 
             except Exception as e:
-                st.error(f"عذراً، حدث خطأ أثناء التحميل: {str(e)}")
+                st.error(f"عذراً، حدث خطأ أثناء المعالجة: {str(e)}")

@@ -95,7 +95,7 @@ if file_type == "فيديو (MP4)":
         )
     )
     
-    # تحويل الاختيار لبروتوكول يفهمه البوت
+    # تحويل الاختيات لبروتوكول يفهمه البوت
     if "4K" in quality_choice:
         selected_quality = "bestvideo+bestaudio/best"
     elif "1080p" in quality_choice:
@@ -117,12 +117,19 @@ if st.button(btn_label):
                 # التحميل مؤقتاً في مجلد السيرفر الحالي
                 download_path = os.getcwd()
                 
-                # خيارات yt-dlp الأساسية
+                # خيارات yt-dlp الأساسية مع حزمة تخطي الحجب والأمان
                 ydl_opts = {
                     'outtmpl': os.path.join(download_path, 'downloaded_file.%(ext)s'),
                     'quiet': True,
                     'no_warnings': True,
-                    'overwrites': True, # استبدال الملف القديم لعدم ملء السيرفر
+                    'overwrites': True,
+                    'nocheckcertificate': True,  # تخطي فحص الشهادات الأمنية للسيرفر
+                    'headers': {  # تمويه السيرفر وكأنه متصفح طبيعي لتجنب الـ 403
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                        'Accept-Language': 'en-US,en;q=0.5',
+                        'Sec-Fetch-Mode': 'navigate',
+                    }
                 }
 
                 if ffmpeg_path:
@@ -146,7 +153,7 @@ if st.button(btn_label):
                 # تحميل المقطع على السيرفر مؤقتاً
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=True)
-                    # استخراج العنوان الحقيقي للمقطع لتسمية الملف النهائي للمستخدم بها
+                    # استخراج العنوان الحقيقي للمقطع
                     original_title = info.get('title', 'download')
                     
                     # تحديد الملف المؤقت المخرج
